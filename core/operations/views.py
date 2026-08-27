@@ -12,10 +12,10 @@ from audit.models import AuditLog
 
 def log_action(user, action, operation, details=""):
     AuditLog.objects.create(
-    user=user,
-    action=action,
-    related_operation=operation,
-    details=details,
+        user=user,
+        action=action,
+        related_operation=operation,
+        details=details,
     )
 
 class OperationViewSet(viewsets.ModelViewSet):
@@ -30,13 +30,15 @@ class OperationViewSet(viewsets.ModelViewSet):
         return Operation.objects.filter(requested_by=user)
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=self.request.user, status='pending')
+        operation = serializer.save(requested_by=self.request.user, status='pending')
+        log_action(self.request.user, "created", operation, f"Operation created with status '{operation.status}'")
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
     def approve(self, request, pk=None):
         operation = self.get_object()
         operation.status = 'approved'
         operation.save()
+        log_action(request.user, "approved", operation)
         return Response({"status": operation.status})
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
@@ -44,6 +46,7 @@ class OperationViewSet(viewsets.ModelViewSet):
         operation = self.get_object()
         operation.status = 'rejected'
         operation.save()
+        log_action(request.user, "rejected", operation)
         return Response({"status": operation.status})
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
@@ -51,11 +54,9 @@ class OperationViewSet(viewsets.ModelViewSet):
         operation = self.get_object()
         if operation.status != 'approved':
             return Response({"error": "Operation must be approved first"}, status=400)
-        # منطق واقعی اجرا (SSH) اینجا اضافه می‌شه
+            # منطق واقعی اجرا (SSH) اینجا اضافه می‌شه
         operation.status = 'executed'
         operation.executed_at = timezone.now()
         operation.save()
+        log_action(request.user, "executed", operation, "Operation executed successfully")
         return Response({"status": operation.status})
-
-
-
