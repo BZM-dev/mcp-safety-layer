@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from .permissions import IsApprover,IsOperatorOrAbove,IsViewerOrAbove
 
 # Create your views here.
 from rest_framework import viewsets, permissions
@@ -23,6 +24,18 @@ class OperationViewSet(viewsets.ModelViewSet):
     serializer_class = OperationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+
+    def get_permissions(self):
+        if self.action == 'create':
+            permission_classes = [IsOperatorOrAbove]
+        elif self.action in ['approve', 'reject']:
+            permission_classes = [IsApprover]
+        elif self.action in ['list', 'retrieve']:
+            permission_classes = [IsViewerOrAbove]
+        else:
+            permission_classes = [permissions.IsAdminUser]
+        return [p() for p in permission_classes]
+
     def get_queryset(self):
         user = self.request.user
         if user.is_staff:
@@ -33,7 +46,7 @@ class OperationViewSet(viewsets.ModelViewSet):
         operation = serializer.save(requested_by=self.request.user, status='pending')
         log_action(self.request.user, "created", operation, f"Operation created with status '{operation.status}'")
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):
         operation = self.get_object()
         operation.status = 'approved'
@@ -41,7 +54,7 @@ class OperationViewSet(viewsets.ModelViewSet):
         log_action(request.user, "approved", operation)
         return Response({"status": operation.status})
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=['post'])
     def reject(self, request, pk=None):
         operation = self.get_object()
         operation.status = 'rejected'
@@ -49,7 +62,7 @@ class OperationViewSet(viewsets.ModelViewSet):
         log_action(request.user, "rejected", operation)
         return Response({"status": operation.status})
 
-    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAdminUser])
+    @action(detail=True, methods=['post'])
     def execute(self, request, pk=None):
         operation = self.get_object()
         if operation.status != 'approved':
