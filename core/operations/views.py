@@ -7,7 +7,16 @@ from rest_framework.response import Response
 from django.utils import timezone
 from .models import Operation
 from .serializers import OperationSerializer
+from audit.models import AuditLog 
 
+
+def log_action(user, action, operation, details=""):
+    AuditLog.objects.create(
+    user=user,
+    action=action,
+    related_operation=operation,
+    details=details,
+    )
 
 class OperationViewSet(viewsets.ModelViewSet):
     queryset = Operation.objects.all()
@@ -47,3 +56,6 @@ class OperationViewSet(viewsets.ModelViewSet):
         operation.executed_at = timezone.now()
         operation.save()
         return Response({"status": operation.status})
+
+
+
